@@ -12,25 +12,24 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # or ["http://localhost:3000"]
+    allow_origins=["http://localhost:3000"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-# Load secrets from backend/.env (local dev)
+
 load_dotenv(Path(__file__).parent / ".env")
 api_key = os.getenv("GOOGLE_API_KEY")
 if not api_key:
     raise RuntimeError("GOOGLE_API_KEY not set. Add it to backend/.env or to the environment.")
-# keep key available for libraries that read os.environ
+
 os.environ["GOOGLE_API_KEY"] = api_key
 
-# Connect Neo4j (your local DB must have bolt enabled)
+# Connect Neo4j 
 graph = Neo4jGraph(
-    url="bolt://localhost:7687",   # default for CLI Neo4j
-    # url="http://localhost:7687",   # default for CLI Neo4j
-    username="neo4j",              # your Neo4j username
-    password="Idonotknow#1"       # your Neo4j password
+    url="bolt://localhost:7687",  
+    username="neo4j",             
+    password=os.getenv("NEO4J_PASSWORD")      
 )
 
 # Gemini model
@@ -63,7 +62,7 @@ async def query_db(request: Request):
                 convo_lines.append(f"Results: {m['results']}")
     convo = "\n".join(convo_lines)
 
-    # Step 1: Generate Cypher query (provide conversation context)
+    #  Generate Cypher query 
     cypher_prompt = (
         "Convert the final user's request into a Cypher query. "
         "Use the DB relations (DIRECTED, roles, ACTED_IN, PRODUCED, Movie). "
@@ -84,7 +83,7 @@ async def query_db(request: Request):
         ):
             cypher_query = cypher_query[1:-1].strip()
 
-    # Step 2: Run query in Neo4j
+    # Run query in Neo4j
     try:
         results = graph.query(cypher_query)
         results = [dict(r) for r in results]
@@ -92,7 +91,7 @@ async def query_db(request: Request):
     except Exception as e:
         return {"error": str(e), "cypher_query": cypher_query}
 
-    # Step 3: Explain results with context
+    # Explain results with context
     explanation_prompt = (
         "Given the conversation and these DB results, reply normally to the user's last question in a human friendly way. "
         "Only use the data from the DB results. Do not invent facts.\n\n"
